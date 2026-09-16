@@ -171,12 +171,21 @@ async function generateCourseSyllabus(topic) {
       body: JSON.stringify({ topic }),
     });
 
-    const data = await response.json();
     clearTimeout(stageTimeout);
 
     if (!response.ok) {
-      throw new Error(data.detail || 'Failed to generate syllabus');
+      let errMsg = 'Failed to generate syllabus';
+      try {
+        const errData = await response.json();
+        errMsg = errData.detail || errData.message || errMsg;
+      } catch (e) {
+        errMsg = await response.text();
+      }
+      throw new Error(errMsg);
     }
+
+    const data = await response.json();
+
 
     // Mark all stages complete
     setStageState(elements.stage1, 'active', 'Complete');
@@ -419,15 +428,23 @@ async function sendChatMessage(message) {
       body: JSON.stringify({ message }),
     });
 
-    const data = await response.json();
     typingEl.remove();
 
     if (!response.ok) {
-      throw new Error(data.detail || 'Instructor response failed');
+      let errMsg = 'Instructor response failed';
+      try {
+        const errData = await response.json();
+        errMsg = errData.detail || errData.message || errMsg;
+      } catch (e) {
+        errMsg = await response.text();
+      }
+      throw new Error(errMsg);
     }
 
+    const data = await response.json();
     appendMessageBubble('instructor', data.reply);
     scrollChatToBottom();
+
 
   } catch (error) {
     typingEl.remove();
@@ -522,11 +539,11 @@ function initSettings() {
   // Save Settings
   elements.btnSaveSettings.addEventListener('click', async () => {
     const key = elements.settingsApiKey.value.trim();
-    const base = settingsApiBase ? settingsApiBase.value.trim() : '';
+    const model = settingsApiBase ? settingsApiBase.value.trim() : '';
 
     const payload = {};
     if (key) payload.api_key = key;
-    if (base) payload.api_base = base;
+    if (model) payload.model_name = model;
 
     try {
       const res = await fetch('/api/settings', {
@@ -551,28 +568,25 @@ async function checkSystemStatus() {
     if (res.ok) {
       const data = await res.json();
       const settingsApiBase = document.getElementById('settings-api-base');
-      if (settingsApiBase && data.api_base) {
-        settingsApiBase.value = data.api_base;
+      if (settingsApiBase && data.model_name) {
+        settingsApiBase.value = data.model_name;
       }
 
       if (data.demo_mode) {
         elements.statusLabel.textContent = 'Demo Mode';
         elements.systemStatusIndicator.style.borderColor = 'rgba(99, 102, 241, 0.4)';
-        elements.settingsStatusText.textContent = 'Demo Mode Active (No API Key Required)';
-      } else if (data.is_modal_no_base) {
-        elements.statusLabel.textContent = 'Modal (No Base URL)';
-        elements.systemStatusIndicator.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-        elements.settingsStatusText.textContent = `Modal Token: ${data.api_key_masked} (Requires Custom Base URL or Demo Mode)`;
+        elements.settingsStatusText.textContent = 'Demo Mode Active (Offline / Simulation)';
       } else if (data.api_key_configured) {
-        elements.statusLabel.textContent = 'Online';
+        elements.statusLabel.textContent = 'Gemini Online';
         elements.systemStatusIndicator.style.borderColor = 'rgba(16, 185, 129, 0.25)';
-        elements.settingsStatusText.textContent = `API Key: ${data.api_key_masked}`;
+        elements.settingsStatusText.textContent = `Gemini (${data.model_name || 'gemini-3.8-flash'}): ${data.api_key_masked}`;
       } else {
         elements.statusLabel.textContent = 'API Key Needed';
         elements.systemStatusIndicator.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-        elements.settingsStatusText.textContent = 'No API key configured in .env';
+        elements.settingsStatusText.textContent = 'No Gemini API key configured in .env';
       }
     }
+
   } catch (e) {
     elements.statusLabel.textContent = 'Offline';
     elements.systemStatusIndicator.style.borderColor = 'rgba(244, 63, 94, 0.4)';

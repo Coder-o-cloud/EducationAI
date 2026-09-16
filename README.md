@@ -1,16 +1,16 @@
 # 📖 EduGPT - Your AI Instructor
 
-EduGPT is an intelligent, multi-agent AI Instructor built using Large Language Models (LLMs) and [LangChain](https://github.com/hwchase17/langchain), inspired by the [CAMEL](https://github.com/camel-ai/camel) (Communicative Agents for "Mind" Exploration) architecture.
+EduGPT is an intelligent, interactive AI teaching assistant powered by the **Google Gemini API** (`google-genai` SDK).
 
-Instead of generic single-prompt responses, EduGPT employs **role-playing AI agents** that collaboratively debate and design a customized, structured syllabus for any topic you want to learn, and then assigns a dedicated **Instructor Agent** to guide and teach you step-by-step in an interactive web classroom.
+Instead of generic single-prompt answers, EduGPT generates an in-depth, structured course syllabus for any topic you want to learn, and assigns a dedicated **AI Instructor** to guide, quiz, and teach you step-by-step in an interactive web classroom.
 
 ---
 
 ## ⚡ Quick Start (Run Instantly)
 
-If this repository already has the `venv` folder set up, you can launch the web application in **one step**:
+If this repository already has the `venv` folder set up, launch the application in **one command**:
 
-### On Windows:
+### On Windows (PowerShell):
 ```powershell
 .\venv\Scripts\python.exe src/server.py
 ```
@@ -23,143 +23,159 @@ If this repository already has the `venv` folder set up, you can launch the web 
 Now open your web browser and navigate to:
 👉 **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
-*(Make sure your `.env` file contains your `OPENAI_API_KEY` before running)*
+*(Ensure your `.env` file contains your `GEMINI_API_KEY`)*
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & How It Works
 
-![Architecture Diagram](diagram.png)
+EduGPT combines an asynchronous **FastAPI** backend with Google's state-of-the-art **Gemini Flash** models:
 
-The workflow consists of four core phases:
-1. **Goal Specification**: The user enters a topic they want to master (e.g., *"Deep Reinforcement Learning"* or *"Microservices System Design"*).
-2. **Collaborative Discussion (CAMEL Framework)**: Two role-playing AI agents (an Assistant agent and an Instructor/User role agent) engage in an iterative dialogue to brainstorm, structure, and refine concepts into a logical sequence.
-3. **Syllabus Synthesis**: A Summarizer agent processes the dialogue history and produces an organized, coherent, step-by-step syllabus.
-4. **Interactive Instruction**: The generated syllabus is loaded into a dedicated **Teaching Agent** that guides the student through each module via an interactive web interface.
+```mermaid
+flowchart LR
+    A[Student Topic Input] --> B[Gemini Curriculum Designer]
+    B --> C[Structured Markdown Syllabus]
+    C --> D[Interactive Classroom Session]
+    D <--> E[Gemini AI Instructor Agent]
+```
+
+1. **Curriculum Synthesis**:
+   - The user inputs any learning topic (e.g., *"C Programming"*, *"System Architecture"*, or *"Quantum Computing"*).
+   - The curriculum generator queries **Gemini** to construct a 3-module syllabus complete with prerequisites, theory, practical code exercises, and capstone projects.
+2. **Stateful Interactive Classroom**:
+   - The student interacts with the **AI Instructor Agent** in the classroom arena.
+   - Built on Gemini's stateful **Interactions API** using `previous_interaction_id`, the agent maintains seamless contextual memory across the conversation.
+3. **Resilient Multi-Model Cascade**:
+   - To prevent rate-limit interruptions (HTTP 429) on free-tier API keys, EduGPT implements an automated model cascade:
+     $$\text{gemini-3.6-flash} \longrightarrow \text{gemini-3.5-flash-lite} \longrightarrow \text{gemini-3.8-flash}$$
+   - If a quota threshold is reached, the next available model seamlessly answers without interrupting your study flow.
+4. **Intelligent Fallback Engine**:
+   - In case of offline usage or complete network outage, an offline curriculum engine activates automatically so learning never stops.
 
 ---
 
 ## ✨ Key Features
 
-- 🤖 **Multi-Agent Collaborative Design**: Two role-playing agents debate topic depth, prerequisites, and milestone sequencing.
-- 🎨 **Product-Ready Web UI**: Built with pure **HTML5, Modern CSS3, and JavaScript (ES6+)** featuring a dark obsidian theme, glassmorphism, responsive design, and micro-animations.
-- 💬 **Interactive Classroom**: Split-view arena with a live course checklist on the left and a real-time markdown chat with the AI Instructor on the right.
-- ⚡ **FastAPI High-Performance Backend**: Non-blocking asynchronous Python backend directly interfacing with LangChain agents.
-- ⌨️ **IME-Safe Chat**: Robust keyboard handling for international keyboard users and smooth Enter-to-send / Shift+Enter for newlines.
-- 📋 **Export & Persistence**: One-click Markdown copy, `.md` file download, and browser `localStorage` persistence.
-- 📓 **Jupyter Notebook Support**: Includes `src/EduGPT.ipynb` for step-by-step experimentation and agent inspection.
+- 🧠 **Google Gemini Powered**: Official `google-genai` SDK implementation utilizing the high-speed, cost-effective Gemini Flash series.
+- 🎨 **Obsidian Glassmorphism UI**: Modern dark-mode interface built with semantic HTML5, modern CSS3, and vanilla JavaScript (ES6+).
+- 🗺️ **Interactive Course Roadmap**: Left sidebar roadmap featuring module progress tracking, dynamic topic switching, and completion checkboxes.
+- 💬 **Real-Time Interactive Classroom**: Line-by-line concept breakdown, instant code reviews, diagnostic quizzes, and real-world analogies.
+- 🔄 **Multi-Turn Contextual Memory**: Remembers previous questions and student answers throughout the session.
+- ⚡ **High-Performance FastAPI**: Asynchronous request handling with non-blocking threads for LLM calls.
+- 📋 **One-Click Export**: Easily copy the generated syllabus as Markdown or export it as a `.md` file.
 
 ---
 
 ## 🔑 Environment Configuration (`.env`)
 
-Before running, create a `.env` file in the **project root directory** (`EduGPT/`).
+Create or update the `.env` file in the **project root directory** (`EduGPT-main/`):
 
-### Standard OpenAI API Key:
 ```env
-OPENAI_API_KEY=sk-your-openai-api-key-here
+GEMINI_API_KEY=AIzaSy...your-gemini-api-key-here
+MODEL_NAME=gemini-3.6-flash
 ```
 
-### Modal / OpenAI-Compatible Bearer Token:
-```env
-OPENAI_API_KEY=wk-cinRWwgU4gH1fo2YbsVC9q.ws-DtsekCD5FAxHfvJ4eBJRXr
-MODAL_TOKEN_ID=wk-cinRWwgU4gH1fo2YbsVC9q
-MODAL_TOKEN_SECRET=ws-DtsekCD5FAxHfvJ4eBJRXr
-```
-
-> ⚠️ **Important `.env` Rules:**
-> - Every line must strictly follow `KEY=VALUE`.
-> - Do **not** leave blank lines or comments without an `=` sign at the end of the file.
-> - The `.env` file is already listed in `.gitignore`, ensuring your keys are never committed to GitHub.
+> [!TIP]
+> **Getting an API Key**:
+> You can generate a free Google Gemini API key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 ---
 
 ## 💻 How to Run the Application
 
-### Option 1: Product-Ready Web App (Recommended)
+### Option 1: Modern Web Application (Recommended)
 
-This is the full-featured, modern interface built with HTML, CSS, JavaScript, and FastAPI.
+This is the primary full-featured web interface:
 
 ```powershell
-# Method A: Direct run via venv Python (Recommended - No activation needed)
+# Run directly with venv Python
 .\venv\Scripts\python.exe src/server.py
-
-# Method B: Activate venv first, then run
-.\venv\Scripts\Activate.ps1
-python src/server.py
 ```
 
 Open your browser at: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
 #### 🎮 Using the Web App:
-1. **Course Studio View**:
-   - Type any topic in the search box (or click quick chips like *Machine Learning*, *System Design*, *Fullstack Web*).
+1. **Course Studio Tab**:
+   - Enter any topic (e.g. *Data Structures & Algorithms*, *Rust Programming*, *DevOps Pipelines*).
    - Click **Generate Syllabus**.
-   - Watch the animated 3-stage agent debate visualizer.
-   - Once generated, review the course plan, copy the Markdown, or export as `.md`.
-2. **Interactive Classroom View**:
-   - Click **Start Learning in Classroom**.
-   - Your course modules will appear in the left sidebar with completion checkboxes and a progress bar.
-   - Chat with your dedicated AI Instructor in the main arena. Click prompt chips (*"Start Module 1"*, *"Real-World Example"*, *"Quiz Me"*, *"Summarize"*) or ask any custom question!
+   - Review your personalized course roadmap, copy or download the markdown.
+2. **Interactive Classroom Tab**:
+   - Switch to the Classroom tab to start your lesson.
+   - Use the prompt chips (*"Start Module 1"*, *"Real-World Example"*, *"Quiz Me"*, *"Summarize Key Points"*) or type custom questions.
+   - Check off modules as you complete them to track your learning progress.
 
 ---
 
-### Option 2: Classic Gradio Prototype
+### Option 2: Classic Gradio Interface
 
-If you want to run the original Gradio interface:
+If you wish to test via the legacy Gradio prototype:
 
 ```powershell
 .\venv\Scripts\python.exe src/run.py
 ```
-
 - **Local URL**: `http://127.0.0.1:7860`
-- **Public Shareable URL**: Temporary `https://....gradio.live` link.
 
 ---
 
-### Option 3: Jupyter Notebook
+## 🔌 REST API Endpoints
 
-If you prefer exploring the CAMEL agents and prompts interactively in Jupyter cells:
+The FastAPI backend (`src/server.py`) provides clean RESTful endpoints:
 
-```powershell
-.\venv\Scripts\pip.exe install notebook
-.\venv\Scripts\python.exe -m notebook src/EduGPT.ipynb
+| Endpoint | Method | Description |
+| :--- | :---: | :--- |
+| `/` | `GET` | Serves the single-page web application |
+| `/api/status` | `GET` | Returns system status, configured model, and masked API key info |
+| `/api/generate-syllabus` | `POST` | Generates a course syllabus using Gemini for `{ "topic": "..." }` |
+| `/api/chat` | `POST` | Communicates with the AI Instructor Agent for `{ "message": "..." }` |
+| `/api/reset` | `POST` | Clears conversation history and interaction state |
+| `/api/settings` | `POST` | Dynamically updates API key, model, or demo mode settings |
+
+---
+
+## 📂 Project Structure
+
+```text
+EduGPT/
+├── .env                       # Environment variables (GEMINI_API_KEY, MODEL_NAME)
+├── .gitignore                 # Git ignore configuration
+├── LICENSE                    # MIT License
+├── README.md                  # Project documentation
+├── diagram.png                # Architecture diagram
+├── pyproject.toml             # Project build configuration
+├── requirements.txt           # Python dependencies (google-genai, fastapi, uvicorn)
+├── setup.py                   # Package setup script
+├── src/
+│   ├── generating_syllabus.py # Gemini-powered curriculum generation engine
+│   ├── run.py                 # Gradio user interface
+│   ├── server.py              # FastAPI server & REST API endpoints
+│   └── teaching_agent.py      # Multi-turn Gemini AI Instructor agent
+└── static/
+    ├── app.js                 # Client-side state, chat handler, and Markdown renderer
+    ├── index.html             # Semantic HTML5 single-page application
+    └── style.css              # Obsidian dark theme and responsive glassmorphism styles
 ```
 
 ---
 
-## 🛠️ First-Time Setup (Only If Starting From Scratch on a New PC)
+## 🛠️ Fresh Installation (New Machine Setup)
 
-> [!NOTE]
-> If a `venv` folder already exists in this directory, **do NOT re-create it**! Re-creating an active virtual environment causes a `Permission denied` error. Follow the [⚡ Quick Start](#-quick-start-run-instantly) section instead.
-
-If you are setting up this repository on a fresh computer:
+If you are setting up this repository on a new computer without an existing `venv`:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/hqanhh/EduGPT.git
-cd EduGPT
+git clone https://github.com/Coder-o-cloud/EducationAI.git
+cd EduGPT-main
 ```
 
 ### 2. Create Virtual Environment
-- **Windows (PowerShell/CMD):**
-  ```powershell
-  python -m venv venv
-  ```
-- **Linux / macOS:**
-  ```bash
-  python3 -m venv venv
-  ```
+```powershell
+python -m venv venv
+```
 
 ### 3. Activate Virtual Environment
 - **Windows (PowerShell):**
   ```powershell
   .\venv\Scripts\Activate.ps1
-  ```
-  *(If you get a script execution policy error, run: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process` and retry)*
-- **Windows (CMD):**
-  ```cmd
-  venv\Scripts\activate.bat
   ```
 - **Linux / macOS:**
   ```bash
@@ -174,95 +190,35 @@ pip install -r requirements.txt
 
 ---
 
-## 🔌 REST API Endpoints
+## ❓ Troubleshooting & FAQs
 
-The FastAPI backend (`src/server.py`) exposes clean REST endpoints:
-
-| Endpoint | Method | Description |
-| :--- | :---: | :--- |
-| `/` | `GET` | Serves the HTML5/CSS3/JavaScript single-page application |
-| `/api/status` | `GET` | Returns system health, API key configuration status, and active topic |
-| `/api/generate-syllabus` | `POST` | Triggers multi-agent CAMEL debate to generate a syllabus for `{ "topic": "..." }` |
-| `/api/chat` | `POST` | Interacts with the AI Teaching Agent for `{ "message": "..." }` |
-| `/api/reset` | `POST` | Clears instructor conversation history and resets active session |
-| `/api/settings` | `POST` | Updates and persists API key in `.env` |
-
----
-
-## 📂 Project Structure
-
-```text
-EduGPT/
-├── .env                       # Environment variables (API keys - gitignored)
-├── .gitignore                 # Git ignore rules
-├── LICENSE                    # MIT License
-├── Makefile                   # Setup automation for Linux/macOS
-├── README.md                  # Project documentation
-├── diagram.png                # CAMEL architecture diagram
-├── pyproject.toml             # Code formatting configuration
-├── requirements.txt           # Python dependencies (pinned for compatibility)
-├── setup.py                   # Package setup script
-├── src/
-│   ├── EduGPT.ipynb           # Interactive exploration notebook
-│   ├── generating_syllabus.py # CAMEL multi-agent syllabus generation logic
-│   ├── run.py                 # Legacy Gradio entrypoint
-│   ├── server.py              # FastAPI server & REST API
-│   └── teaching_agent.py      # LangChain teaching instructor agent
-└── static/
-    ├── app.js                 # Frontend JavaScript (state, chat, Markdown parser)
-    ├── index.html             # Semantic HTML5 single-page application
-    └── style.css              # Custom CSS (dark mode, glassmorphism, responsive)
-```
-
----
-
-## ❓ Frequently Asked Questions & Troubleshooting
-
-#### 1. `Error: [Errno 13] Permission denied: '...venv\Scripts\python.exe'`
-- **Reason:** A Python process is already using `python.exe`, or OneDrive is syncing files.
-- **Solution:** You do not need to re-run `python -m venv venv` because `venv` is already created. Run the app directly with:
-  ```powershell
-  .\venv\Scripts\python.exe src/server.py
-  ```
-
-#### 2. `cannot be loaded because running scripts is disabled on this system`
-- **Reason:** Windows PowerShell script execution policy restricts unapproved scripts.
-- **Solution:** Run this command once in PowerShell:
-  ```powershell
-  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-  .\venv\Scripts\Activate.ps1
-  ```
-
-#### 3. `ImportError: cannot import name 'ChatOpenAI' from 'langchain.chat_models'`
-- **Reason:** Running outside of the virtual environment with an incompatible LangChain version installed globally.
-- **Solution:** Always run using the `venv` Python:
-  ```powershell
-  .\venv\Scripts\python.exe src/server.py
-  ```
-
-#### 4. `ValueError: not enough values to unpack (expected 2, got 1)`
-- **Reason:** Trailing empty lines in `.env`.
-- **Solution:** Open `.env` and remove any empty lines. Every line must be `KEY=VALUE`.
-
-#### 5. `ERROR: [Errno 10048] error while attempting to bind on address ('127.0.0.1', 8000)`
-- **Reason:** Port 8000 is already in use by an existing server process.
-- **Solution:** Stop the existing process, or kill all active Python instances in PowerShell:
+#### 1. `Error: Port 8000 is already in use`
+- **Reason**: An existing Uvicorn or Python process is still bound to port 8000.
+- **Solution**: Terminate the previous process in PowerShell:
   ```powershell
   Stop-Process -Name python -Force -ErrorAction SilentlyContinue
   .\venv\Scripts\python.exe src/server.py
+  ```
+
+#### 2. `Quota exceeded / Rate Limit (Error 429)`
+- **Reason**: Free-tier Gemini API keys have per-minute request limits.
+- **Solution**: EduGPT automatically cascades to alternative available models (`gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.8-flash`). If all quota is exhausted, the built-in curriculum engine activates seamlessly so your session continues uninterrupted.
+
+#### 3. `Execution Policy restriction on PowerShell`
+- **Reason**: Windows default policy restricts running PowerShell scripts.
+- **Solution**: Run the following command once:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
   ```
 
 ---
 
 ## 🤝 Contributing
 
-Contributions, bug reports, and feature requests are welcome! Feel free to open an issue or submit a pull request.
+Contributions, issues, and feature requests are welcome! Feel free to open an issue or submit a pull request.
 
 ---
 
-## 📬 Contact
+## 📄 License
 
-For questions or inquiries:
-- Author: **hqanhh**
-- Email: [huynhquynhanh2003@gmail.com](mailto:huynhquynhanh2003@gmail.com)#   E d u c a t i o n A I  
- 
+This project is licensed under the [MIT License](LICENSE).

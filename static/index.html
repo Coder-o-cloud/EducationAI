@@ -306,13 +306,14 @@
           <button class="icon-button-close" id="btn-close-modal" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-          <label for="settings-api-key" class="form-label">OpenAI / Bearer API Key</label>
-          <input type="password" id="settings-api-key" class="text-input" placeholder="sk-... (or Bearer token)">
-          <p class="form-hint">Official OpenAI keys start with <code>sk-</code>. Get one at <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--primary-light);">platform.openai.com</a>.</p>
+          <label for="settings-api-key" class="form-label">Google Gemini API Key</label>
+          <input type="password" id="settings-api-key" class="text-input" placeholder="AIzaSy... (Gemini API Key)">
+          <p class="form-hint">Google AI Studio keys start with <code>AIzaSy</code>. Get one at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--primary-light);">aistudio.google.com</a>.</p>
 
-          <label for="settings-api-base" class="form-label">Custom API Base URL (Optional for Modal / Local LLM)</label>
-          <input type="text" id="settings-api-base" class="text-input" placeholder="https://<your-app>.modal.run/v1 or http://localhost:11434/v1">
-          <p class="form-hint">Required if using Modal endpoints, Ollama, or custom OpenAI-compatible gateways.</p>
+          <label for="settings-api-base" class="form-label">Gemini Model</label>
+          <input type="text" id="settings-api-base" class="text-input" placeholder="gemini-3.8-flash">
+          <p class="form-hint">Default is <code>gemini-3.8-flash</code> via the Gemini Interactions API.</p>
+
 
           <div class="settings-status-box" id="settings-status-box">
             <span class="dot-sm"></span>

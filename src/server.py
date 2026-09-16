@@ -28,20 +28,15 @@ if env_file.exists():
                 key, val = line.split("=", 1)
                 os.environ[key.strip("'\" ")] = val.strip("'\" \r\n")
 
-# Auto-configure API key from Modal proxy credentials if set
-if "MODAL_PROXY_TOKEN_ID" in os.environ and "MODAL_PROXY_TOKEN_SECRET" in os.environ:
-    os.environ["OPENAI_API_KEY"] = f"{os.environ['MODAL_PROXY_TOKEN_ID']}.{os.environ['MODAL_PROXY_TOKEN_SECRET']}"
-elif "MODAL_TOKEN_ID" in os.environ and "MODAL_TOKEN_SECRET" in os.environ:
-    os.environ["OPENAI_API_KEY"] = f"{os.environ['MODAL_TOKEN_ID']}.{os.environ['MODAL_TOKEN_SECRET']}"
-
-# Import LangChain agents
+# Import Gemini agents
 try:
-    from generating_syllabus import generate_syllabus
+    from generating_syllabus import generate_syllabus, build_fallback_syllabus
     from teaching_agent import teaching_agent
 except Exception as e:
     print(f"Notice: Agent module loaded with warnings: {e}")
     generate_syllabus = None
     teaching_agent = None
+
 
 app = FastAPI(
     title="EduGPT AI Instructor API",
@@ -79,14 +74,9 @@ class ChatRequest(BaseModel):
 
 class SettingsUpdateRequest(BaseModel):
     api_key: Optional[str] = None
-    api_base: Optional[str] = None
+    model_name: Optional[str] = None
     demo_mode: Optional[bool] = False
 
-
-def is_modal_token_without_base(key: str) -> bool:
-    """Check if token is a Modal token (wk-...) without custom base URL."""
-    base = os.environ.get("OPENAI_API_BASE", "").strip()
-    return key.startswith("wk-") and not base
 
 
 def build_fallback_syllabus(topic: str) -> str:
@@ -168,13 +158,9 @@ Think of {t} as a pipeline: inputs are validated, transformed according to busin
 Would you like me to walk through a concrete **code example**, or would you like to explore the theoretical mechanics first?"""
 
     elif "example" in msg_lower or "code" in msg_lower:
-        return f"""### Practical Implementation Example for {t}
-
-Here is an idiomatic demonstration showcasing core conventions:
-
-```python
-# Idiomatic implementation pattern for {t}
-class {t.replace(' ', '').replace('&', '')}Controller:
+        class_name = t.replace(' ', '').replace('&', '') + "Controller"
+        code_block = f"""# Idiomatic implementation pattern for {t}
+class {class_name}:
     def __init__(self, name: str, debug: bool = True):
         self.name = name
         self.debug = debug
@@ -185,17 +171,25 @@ class {t.replace(' ', '').replace('&', '')}Controller:
         if not payload:
             raise ValueError("Payload cannot be empty")
             
-        print(f"[{self.name}] Processing step for: {list(payload.keys())}")
+        print(f"[{{self.name}}] Processing step for: {{list(payload.keys())}}")
         self._state = "COMPLETED"
-        return {"status": "success", "processed_payload": payload}
+        return {{"status": "success", "processed_payload": payload}}
 
 # Execution
-controller = {t.replace(' ', '').replace('&', '')}Controller("EduDemoEngine")
+controller = {class_name}("EduDemoEngine")
 result = controller.execute_pipeline({{"topic": "{t}", "level": "advanced"}})
-print(result)
+print(result)"""
+
+        return f"""### Practical Implementation Example for {t}
+
+Here is an idiomatic demonstration showcasing core conventions:
+
+```python
+{code_block}
 ```
 
 Notice the defensive check and clean state tracking. Would you like to build on this structure?"""
+
 
     elif "summar" in msg_lower:
         return f"""### Key Takeaways for {t}:
@@ -222,8 +216,8 @@ Which direction would best assist your learning right now?"""
 
 @app.get("/api/status")
 def get_status():
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    api_base = os.environ.get("OPENAI_API_BASE", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    model_name = os.environ.get("MODEL_NAME", "gemini-3.8-flash")
 
     masked_key = ""
     if api_key:
@@ -233,14 +227,12 @@ def get_status():
             else "configured"
         )
 
-    is_modal_no_base = is_modal_token_without_base(api_key)
-
     return {
         "status": "online",
+        "provider": "google-gemini",
+        "model_name": model_name,
         "api_key_configured": bool(api_key and not api_key.startswith("your_")),
         "api_key_masked": masked_key,
-        "api_base": api_base,
-        "is_modal_no_base": is_modal_no_base,
         "demo_mode": current_session["demo_mode"],
         "active_topic": current_session["topic"],
         "syllabus_ready": current_session["syllabus_ready"],
@@ -252,12 +244,12 @@ def get_status():
 def update_settings(payload: SettingsUpdateRequest):
     env_updates = {}
     if payload.api_key is not None:
-        os.environ["OPENAI_API_KEY"] = payload.api_key
-        env_updates["OPENAI_API_KEY"] = payload.api_key
+        os.environ["GEMINI_API_KEY"] = payload.api_key
+        env_updates["GEMINI_API_KEY"] = payload.api_key
 
-    if payload.api_base is not None:
-        os.environ["OPENAI_API_BASE"] = payload.api_base
-        env_updates["OPENAI_API_BASE"] = payload.api_base
+    if payload.model_name is not None:
+        os.environ["MODEL_NAME"] = payload.model_name
+        env_updates["MODEL_NAME"] = payload.model_name
 
     if payload.demo_mode is not None:
         current_session["demo_mode"] = payload.demo_mode
@@ -302,12 +294,10 @@ async def api_generate_syllabus(payload: SyllabusRequest):
     if not topic:
         raise HTTPException(status_code=400, detail="Topic cannot be empty")
 
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    api_base = os.environ.get("OPENAI_API_BASE", "")
+    api_key = os.environ.get("GEMINI_API_KEY", "")
 
-    # If demo mode is forced or if Modal token is provided without an endpoint base URL:
-    if payload.force_demo or current_session["demo_mode"] or is_modal_token_without_base(api_key):
-        # Generate rich structured fallback syllabus
+    # If demo mode is forced:
+    if payload.force_demo or current_session["demo_mode"]:
         syllabus = build_fallback_syllabus(topic)
         current_session["topic"] = topic
         current_session["syllabus"] = syllabus
@@ -315,33 +305,29 @@ async def api_generate_syllabus(payload: SyllabusRequest):
         current_session["total_messages"] = 0
         current_session["demo_mode"] = True
 
-        note = ""
-        if is_modal_token_without_base(api_key):
-            note = "Notice: Modal token detected without a Modal Base URL. Generated syllabus using EduGPT Demo Engine. To use live LLM, configure OpenAI API Key or Modal Base URL in Settings."
-
         return {
             "status": "success",
             "topic": topic,
             "syllabus": syllabus,
             "demo_mode": True,
-            "notice": note,
+            "notice": "Demo Mode active. Generated curriculum using EduGPT Intelligent Engine.",
         }
 
     if not api_key or api_key.startswith("your_"):
         raise HTTPException(
             status_code=400,
-            detail="OpenAI API key is missing. Please provide a valid key in Settings or enable Demo Mode.",
+            detail="Gemini API key is missing. Please provide a valid key in Settings or enable Demo Mode.",
         )
 
     task = f"Generate a comprehensive course syllabus to teach the topic: {topic}"
 
     def run_sync_generation():
         if generate_syllabus is None:
-            raise RuntimeError("Agent module could not be loaded.")
+            raise RuntimeError("Gemini syllabus generator could not be loaded.")
         return generate_syllabus(topic, task)
 
     try:
-        # Run blocking LLM generation in background thread
+        # Run blocking Gemini call in background thread
         syllabus = await asyncio.to_thread(run_sync_generation)
 
         # Seed the teaching agent
@@ -363,46 +349,33 @@ async def api_generate_syllabus(payload: SyllabusRequest):
     except Exception as e:
         error_msg = str(e)
         error_lower = error_msg.lower()
-        print(f"Error generating syllabus: {error_msg}")
+        print(f"Error generating syllabus with Gemini: {error_msg}")
         
-        # If the error is an authentication error or invalid API key from OpenAI,
-        # automatically fall back to the built-in curriculum engine so the user isn't stuck!
         auth_and_quota_keywords = [
-            "incorrect api key",
-            "invalid api key",
-            "authenticationerror",
-            "authentication error",
-            "error code: 401",
-            "unauthorized",
-            "api key not found",
-            "no api_key provided",
-            "error code: 429",
-            "ratelimiterror",
-            "rate limit",
-            "insufficient_quota",
-            "plan credits cannot be applied",
-            "spend limit",
-            "quota",
+            "429", "quota", "rate limit", "ratelimit", "too_many_requests",
+            "api_key_invalid", "invalid_argument", "401", "unauthorized",
+            "resource_exhausted", "not_found",
         ]
-        is_recoverable_error = any(kw in error_lower for kw in auth_and_quota_keywords) or type(e).__name__ in ("AuthenticationError", "OpenAIRateLimitError", "RateLimitError", "APIError")
+        is_recoverable = any(kw in error_lower for kw in auth_and_quota_keywords)
 
-        if is_recoverable_error:
-            print(f"API key or quota issue ({type(e).__name__}). Falling back to EduGPT curriculum engine...")
+        if is_recoverable:
+            print("Gemini quota or rate limit issue. Falling back to EduGPT curriculum engine...")
             syllabus = build_fallback_syllabus(topic)
+            if teaching_agent is not None:
+                teaching_agent.seed_agent(syllabus, task)
             current_session["topic"] = topic
             current_session["syllabus"] = syllabus
             current_session["syllabus_ready"] = True
             current_session["total_messages"] = 0
-            current_session["demo_mode"] = True
+            current_session["demo_mode"] = False
 
-            reason = "Endpoint limit or credits reached" if ("429" in error_lower or "credit" in error_lower or "quota" in error_lower) else "API authentication rejected"
-
+            reason = "Free tier quota limit (429)" if ("429" in error_lower or "quota" in error_lower) else "Gemini notice"
             return {
                 "status": "success",
                 "topic": topic,
                 "syllabus": syllabus,
-                "demo_mode": True,
-                "notice": f"{reason} from provider. Generated curriculum using EduGPT Intelligent Engine. (To use live LLM, check your Modal/OpenAI account credits).",
+                "demo_mode": False,
+                "notice": f"{reason}. Generated curriculum via EduGPT Curriculum Engine. You can proceed to the Classroom tab for live lessons!",
             }
 
         raise HTTPException(
@@ -423,8 +396,8 @@ async def api_chat(payload: ChatRequest):
             detail="No active syllabus found. Please design a syllabus in Course Studio first.",
         )
 
-    # If currently in demo mode or if using mock engine
-    if current_session["demo_mode"]:
+    # Only force simulated reply if demo_mode was explicitly requested in settings
+    if current_session.get("force_demo", False):
         await asyncio.sleep(0.6)  # Natural conversational pacing
         reply = build_fallback_instructor_reply(message, current_session["topic"])
         current_session["total_messages"] += 2
@@ -445,21 +418,18 @@ async def api_chat(payload: ChatRequest):
     except Exception as e:
         error_msg = str(e)
         error_lower = error_msg.lower()
-        print(f"Error during instructor chat: {error_msg}")
+        print(f"Error during Gemini instructor chat: {error_msg}")
 
         auth_and_quota_keywords = [
-            "incorrect api key", "invalid api key", "authenticationerror",
-            "authentication error", "error code: 401", "unauthorized",
-            "error code: 429", "ratelimiterror", "rate limit",
-            "insufficient_quota", "plan credits cannot be applied", "spend limit",
+            "429", "quota", "rate limit", "ratelimit", "too_many_requests",
+            "api_key_invalid", "401", "unauthorized", "resource_exhausted",
         ]
-        is_recoverable_error = any(kw in error_lower for kw in auth_and_quota_keywords) or type(e).__name__ in ("AuthenticationError", "OpenAIRateLimitError", "RateLimitError", "APIError")
+        is_recoverable = any(kw in error_lower for kw in auth_and_quota_keywords)
 
-        if is_recoverable_error:
-            # Fallback to simulated instructor reply
+        if is_recoverable:
+            # Fallback for this single turn only without locking future chat turns
             reply = build_fallback_instructor_reply(message, current_session["topic"])
             current_session["total_messages"] += 2
-            current_session["demo_mode"] = True
             return {"status": "success", "reply": reply}
 
         raise HTTPException(
@@ -468,12 +438,16 @@ async def api_chat(payload: ChatRequest):
         )
 
 
+
 @app.post("/api/reset")
 def api_reset():
     if teaching_agent is not None:
         teaching_agent.conversation_history = []
+        teaching_agent.last_interaction_id = None
+        teaching_agent.pending_human_input = None
     current_session["total_messages"] = 0
     return {"status": "success", "message": "Chat conversation reset"}
+
 
 
 # Serve static web assets

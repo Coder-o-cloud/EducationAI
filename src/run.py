@@ -5,14 +5,17 @@ import gradio as gr
 from generating_syllabus import generate_syllabus
 from teaching_agent import teaching_agent
 
-# import your OpenAI key (put in your .env file)
-with open(".env", "r") as f:
-    env_file = f.readlines()
-envs_dict = {
-    key.strip("'"): value.strip("\n")
-    for key, value in [(i.split("=")) for i in env_file]
-}
-os.environ["OPENAI_API_KEY"] = envs_dict["OPENAI_API_KEY"]
+# Load Gemini API key from .env
+from pathlib import Path
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    with open(_env_path, "r", encoding="utf-8") as f:
+        for _line in f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ[_k.strip()] = _v.strip()
+
 
 with gr.Blocks() as demo:
     gr.Markdown("# Your AI Instructor")
